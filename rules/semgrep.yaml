@@ -1,0 +1,18 @@
+rules:
+  - id: arq-001-detect-internal-import
+    languages:
+      - java
+    message: "Dependencia detectada (potencial acoplamiento)."
+    severity: WARNING
+    pattern-regex: import\s+.*;
+
+  - id: arq-002-detect-vendor-sdk
+    languages:
+      - java
+    message: "Dependencia de proveedor Cloud/SDK detectada."
+    severity: INFO
+    pattern-either:
+      - pattern-regex: import\s+software\.amazon\.awssdk\..*;
+      - pattern-regex: import\s+com\.amazonaws\..*;
+      - pattern-regex: import\s+com\.google\.cloud\..*;
+      - pattern-regex: import\s+com\.azure\..*;

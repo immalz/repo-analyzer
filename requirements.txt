@@ -1,0 +1,3 @@
+pyyaml==6.0.3
+pydantic==2.13.5
+semgrep==1.177.0

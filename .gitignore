@@ -1,0 +1,14 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+temp_repo_clonado/
+output.json
+
+# Archivos generados
+output.json
+temp_repo_clonado/
+
+# IDE
+.vscode/
