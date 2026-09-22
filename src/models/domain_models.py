@@ -7,6 +7,7 @@ class Evidence(BaseModel):
     file_path: str;
     line_number: int;
     matched_content: str;
+    layer: str = "unknown";
 
 # segun las reglas que se implementen, esta zona representa el veredicto para cada una.
 class RuleEvaluation(BaseModel):

@@ -1,0 +1,52 @@
+criteria:
+  ARQ.001:
+    name: "Estilo Arquitectónico"
+    confidence: 0.6
+
+    metrics:
+      - layer_violations
+      - domain_violations
+      - application_violations
+      - ports_layer_present
+
+    scores:
+      5:
+        all:
+          - layer_violations == 0
+          - ports_layer_present == true
+
+      3:
+        all:
+          - layer_violations <= 5
+          - domain_violations == 0
+
+      0:
+        any:
+          - layer_violations > 5
+          - structure_classifiable == false
+
+  ARQ.002:
+    name: "Aislamiento de Dependencias / SDK Específicos"
+    confidence: 0.9
+
+    metrics:
+      - domain_leak
+      - encapsulation_ratio
+      - spread
+
+    scores:
+      5:
+        all:
+          - domain_leak == 0
+          - encapsulation_ratio >= 1.0
+          - portability_class != "CLOUD_SPECIFIC"
+
+      3:
+        all:
+          - domain_leak == 0
+          - encapsulation_ratio >= 0.7
+
+      0:
+        any:
+          - domain_leak > 0
+          - encapsulation_ratio < 0.7

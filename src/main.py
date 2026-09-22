@@ -5,6 +5,9 @@ import shutil
 import stat
 from analyzer.semgrep_runner import run_semgrep
 from config.loader import load_config
+from analyzer.architecture_matcher import ArchitectureMatcher
+from analyzer.evaluator import Evaluator
+from models.domain_models import FinalReport
 
 def main():
     # lectura de archivo de configuracion
@@ -38,23 +41,13 @@ def main():
     
     print(f"¡Semgrep terminó! Se encontraron {len(evidences)} evidencias.")
     
-    # Agrupar evidencias por regla (check_id)
-    from models.domain_models import FinalReport, RuleEvaluation
-    
-    evidences_by_rule = {}
+    matcher = ArchitectureMatcher(project_config.get("architecture", {}))
     for evi in evidences:
-        if evi.check_id not in evidences_by_rule:
-            evidences_by_rule[evi.check_id] = []
-        evidences_by_rule[evi.check_id].append(evi)
-        
-    evaluations = []
-    for rule_id, evs in evidences_by_rule.items():
-        evaluations.append(RuleEvaluation(
-            rule_id=rule_id,
-            score=0, # Score temporal ya que aún no hay evaluador complejo
-            metrics={"total_hallazgos": len(evs)},
-            evidence=evs
-        ))
+        evi.layer = matcher.identify_layer(evi.file_path)
+
+    
+    evaluator = Evaluator(project_config)
+    evaluations = evaluator.evaluate_all(evidences)
         
     report = FinalReport(
         repository_path=target_path,
