@@ -1,18 +1,32 @@
 rules:
-  - id: arq-001-detect-internal-import
+  - id: java-import
     languages:
       - java
-    message: "Dependencia detectada (potencial acoplamiento)."
-    severity: WARNING
-    pattern-regex: import\s+.*;
+    message: "Import statement detectado."
+    severity: INFO
+    pattern-regex: '^\s*import\s+[a-zA-Z0-9_.*]+;'
 
-  - id: arq-002-detect-vendor-sdk
+  - id: cloud-vendor-sdk-import
     languages:
       - java
-    message: "Dependencia de proveedor Cloud/SDK detectada."
+    message: "SDK Vendor detectado."
     severity: INFO
     pattern-either:
-      - pattern-regex: import\s+software\.amazon\.awssdk\..*;
-      - pattern-regex: import\s+com\.amazonaws\..*;
-      - pattern-regex: import\s+com\.google\.cloud\..*;
-      - pattern-regex: import\s+com\.azure\..*;
+      - pattern-regex: '^\s*import\s+(?:static\s+)?software\.amazon\.awssdk\..*;'
+      - pattern-regex: '^\s*import\s+(?:static\s+)?com\.amazonaws\..*;'
+      - pattern-regex: '^\s*import\s+(?:static\s+)?com\.google\.cloud\..*;'
+      - pattern-regex: '^\s*import\s+(?:static\s+)?com\.azure\..*;'
+
+  - id: java-interface-declaration
+    languages:
+      - java
+    message: "Declaracion de interfaz."
+    severity: INFO
+    pattern: interface $X { ... }
+
+  - id: java-class-implements
+    languages:
+      - java
+    message: "Clase implementa interfaz."
+    severity: INFO
+    pattern: class $X implements $Y { ... }

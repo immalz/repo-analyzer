@@ -1,0 +1,19 @@
+technologies:
+  aws_sdk:
+    type: VENDOR_SDK
+    portability_class: CLOUD_SPECIFIC
+    patterns:
+      - software.amazon.awssdk
+      - com.amazonaws
+
+  azure_sdk:
+    type: VENDOR_SDK
+    portability_class: CLOUD_SPECIFIC
+    patterns:
+      - com.azure
+
+  gcp_sdk:
+    type: VENDOR_SDK
+    portability_class: CLOUD_SPECIFIC
+    patterns:
+      - com.google.cloud

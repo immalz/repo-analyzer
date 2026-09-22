@@ -24,6 +24,7 @@ criteria:
         any:
           - layer_violations > 5
           - structure_classifiable == false
+          - domain_violations > 0
 
   ARQ.002:
     name: "Aislamiento de Dependencias / SDK Específicos"

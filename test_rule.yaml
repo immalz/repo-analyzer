@@ -1,0 +1,6 @@
+rules:
+  - id: test
+    languages: [java]
+    pattern: interface  { ... }
+    message: test
+    severity: INFO

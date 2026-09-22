@@ -6,27 +6,9 @@ project:
 
 repository:
   type: git
+  # url: https://github.com/ThingsWithPings/simple-crud-springboot-project #crud simple que aplica ciertos criterios para su arquitectura, con fallas.
+  # url: https://github.com/Saurabh-pec/Calculator-javaProject # proyecto spaggeti falla con 0
   url: https://github.com/SvenWoltmann/hexagonal-architecture-java # proyecto con arquitectura hexagonal
-  # url: https://github.com/ThingsWithPings/simple-crud-springboot-project # repositorio basico de un crud en sprintboot
+  # url: https://github.com/Azure-Samples/java-on-azure-examples # ejemplo con azure
   # url: /temp_repo_clonado
   branch: main
-
-# config para projecto hexagonal
-architecture:
-  domain:
-    - "model/src/main/java/**"
-  application:
-    - "application/src/main/java/**"
-  infrastructure:
-    - "adapter/src/main/java/**"
-    - "bootstrap/src/main/java/**"
-
-# config para proyecto crud
-# architecture:
-#   domain:
-#     - "src/main/java/**/entity/**"
-#   application:
-#     - "src/main/java/**/service/**"
-#   infrastructure:
-#     - "src/main/java/**/repository/**"
-#     - "src/main/java/**/controller/**"

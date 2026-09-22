@@ -1,10 +1,10 @@
 import subprocess
 import json
-from typing import List
+from typing import List, Dict
 from models.domain_models import Evidence
-
 import sys
 import os
+
 def run_semgrep(repo_path: str, rules_path: str) -> List[Evidence]:
     semgrep_path = os.path.join(os.path.dirname(sys.executable), "semgrep.exe")
     command = [
@@ -26,14 +26,14 @@ def run_semgrep(repo_path: str, rules_path: str) -> List[Evidence]:
         print("ERROR en semgrep_runner:", e)
         return []
 
-    evidences = []
+    evidences_map: Dict[str, Evidence] = {}
+    
     for finding in semgrep_data.get("results", []):
         try:
             file_path = finding.get("path", "")
             line_num = finding.get("start", {}).get("line", 0)
-            
-            # Leer el contenido real de la línea para evadir el bug de Semgrep ("requires login")
             matched_content = finding.get("extra", {}).get("lines", "")
+            
             if matched_content == "requires login" and file_path and line_num > 0:
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
@@ -42,15 +42,22 @@ def run_semgrep(repo_path: str, rules_path: str) -> List[Evidence]:
                             matched_content = lines[line_num - 1].strip()
                 except Exception:
                     pass
-
-            evidence = Evidence(
-                check_id=finding.get("check_id", ""),
-                file_path=file_path,
-                line_number=line_num,
-                matched_content=matched_content
-            )
-            evidences.append(evidence)
+            
+            check_id = finding.get("check_id", "")
+            
+            # Deduplicacion: usar file + line + content como ID unico
+            key = f"{file_path}::{line_num}::{matched_content}"
+            if key in evidences_map:
+                if check_id not in evidences_map[key].tags:
+                    evidences_map[key].tags.append(check_id)
+            else:
+                evidences_map[key] = Evidence(
+                    file_path=file_path,
+                    line_number=line_num,
+                    matched_content=matched_content,
+                    tags=[check_id]
+                )
         except Exception:
             continue
 
-    return evidences
+    return list(evidences_map.values())

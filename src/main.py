@@ -1,64 +1,83 @@
-import subprocess
-import json
+import sys
 import os
 import shutil
+import subprocess
 import stat
-from analyzer.semgrep_runner import run_semgrep
+import json
+
 from config.loader import load_config
-from analyzer.architecture_matcher import ArchitectureMatcher
-from analyzer.evaluator import Evaluator
+from engine.semgrep_runner import run_semgrep
+from engine.discoverer import Discoverer
+from engine.classifier import Classifier
+from engine.metrics import MetricsCalculator
+from engine.scoring import ScoringEngine
 from models.domain_models import FinalReport
 
 def main():
-    # lectura de archivo de configuracion
     project_config = load_config("src/portability.config.yaml")
-    repo_url = project_config["repository"]["url"]
-    print(f"Iniciando el analisis en: {repo_url}")
+    criteria_catalog = load_config("catalog/criteria.yaml")
+    tech_catalog = load_config("catalog/technology.yaml")
 
-    repo_url_clean = repo_url.lstrip("/")
+    repo_url = project_config["repository"]["url"]
+    branch = project_config["repository"].get("branch", "main")
     
-    # dependiendo si la ruta que se configuro es una carpeta local o una url de algun repositorio
-    if os.path.isdir(repo_url_clean) or repo_url_clean == "temp_repo_clonado":
-        target_path = repo_url
-        print("El config apunta a un directorio local. Saltando clonación...")
-    else:
-        target_path = "./temp_repo_clonado"
-        print(f"Clonando repositorio desde {repo_url}...")
-        
+    print(f"Iniciando el analisis en: {repo_url} (branch: {branch})")
+    
+    target_path = "./temp_repo_clonado"
+    
+    if os.path.exists(target_path):
         def remove_readonly(func, path, _):
             os.chmod(path, stat.S_IWRITE)
             func(path)
-            
-        if os.path.exists(target_path):
-            shutil.rmtree(target_path, onerror=remove_readonly)
-            
-        subprocess.run(["git", "clone", repo_url, target_path], check=True)
-
-    print(f"Iniciando el analisis en: {target_path}")
-    print("Ejecutando semgrep...")
-
-    evidences = run_semgrep(target_path, "rules/semgrep.yaml")
-    
-    print(f"¡Semgrep terminó! Se encontraron {len(evidences)} evidencias.")
-    
-    matcher = ArchitectureMatcher(project_config.get("architecture", {}))
-    for evi in evidences:
-        evi.layer = matcher.identify_layer(evi.file_path)
-
-    
-    evaluator = Evaluator(project_config)
-    evaluations = evaluator.evaluate_all(evidences)
+        shutil.rmtree(target_path, onerror=remove_readonly)
         
+    print(f"Clonando repositorio...")
+    try:
+        if repo_url.startswith("http"):
+            subprocess.run(["git", "clone", "--branch", branch, "--depth", "1", repo_url, target_path], check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        print(f"\n[ERROR] No se pudo clonar el repositorio.")
+        print(f"Causa posible: La rama '{branch}' no existe o el repositorio es privado/inexistente.")
+        print(f"Detalle técnico: {e.stderr.decode('utf-8').strip() if e.stderr else 'Git clone failed'}")
+        sys.exit(1)
+    
+    # Obtener el commit SHA determinista
+    res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=target_path, capture_output=True, text=True, check=True)
+    commit_sha = res.stdout.strip()
+    
+    print("Ejecutando semgrep...")
+    evidences = run_semgrep(target_path, "rules/semgrep.yaml")
+    print(f"¡Semgrep terminó! Se encontraron {len(evidences)} evidencias unicas.")
+    
+    print("Discovery...")
+    discoverer = Discoverer(target_path)
+    components, modules = discoverer.discover(evidences)
+    print(f"Componentes encontrados: {len(components)}, Modulos lógicos: {len(modules)}")
+    
+    print("Classification...")
+    classifier = Classifier(project_config.get("overrides", {}).get("module_roles", {}))
+    classifier.classify(components)
+            
+    print("Calculando métricas...")
+    metrics_calc = MetricsCalculator(tech_catalog)
+    arq001_metrics = metrics_calc.calculate_arq001(components)
+    arq002_metrics = metrics_calc.calculate_arq002(components)
+    
+    print("Evaluando Scores...")
+    scoring = ScoringEngine(criteria_catalog)
+    eval_001 = scoring.evaluate_arq001(arq001_metrics, evidences)
+    eval_002 = scoring.evaluate_arq002(arq002_metrics, evidences)
+    
     report = FinalReport(
-        repository_path=target_path,
-        evaluations=evaluations
+        repository_path=repo_url,
+        commit_sha=commit_sha,
+        evaluations=[eval_001, eval_002]
     )
     
-    os.makedirs("result", exist_ok=True)
     with open("result/output.json", "w", encoding="utf-8") as f:
-        f.write(report.model_dump_json(indent=4))
+        json.dump(report.model_dump(), f, indent=4, ensure_ascii=False)
         
-    print("Reporte final guardado exitosamente en result/output.json")
-
-if __name__ == '__main__':
+    print("Analisis finalizado exitosamente. (result/output.json)")
+    
+if __name__ == "__main__":
     main()
