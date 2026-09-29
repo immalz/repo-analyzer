@@ -1,10 +1,12 @@
-"""Escenarios de punta a punta con el catalogo real (catalog/criteria.yaml)."""
+"""MOTOR 2 + MOTOR 3 - Escenarios de punta a punta con el catalogo real (catalog/criteria.yaml)."""
 import unittest
 
-from builders import AZURE_BLOB, CRITERIA_FILE, TECH_CATALOG, component, port_component
+from builders import AZURE_BLOB, CRITERIA_FILE, TECHNOLOGIES, component, inventory, port_component
+from analysis.analyzers.arq001_architecture_style import ArchitectureStyleAnalyzer
+from analysis.analyzers.arq002_sdk_isolation import SdkIsolationAnalyzer
+from analysis.technologies import TechnologyMatcher
 from config.loader import load_criteria
-from engine.metrics import MetricsCalculator
-from engine.scoring import ScoringEngine
+from evaluation.engine import EvaluationEngine
 from models.enums import EvaluationStatus, ModuleRole
 
 
@@ -12,14 +14,15 @@ class CatalogScenarioTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.criteria = load_criteria(CRITERIA_FILE)
-        cls.engine = ScoringEngine(cls.criteria)
-        cls.calculator = MetricsCalculator(TECH_CATALOG, cls.criteria["ARQ.001"].parameters["domain_allowed_packages"])
+        cls.engine = EvaluationEngine(cls.criteria)
 
     def evaluate_arq001(self, *components):
-        return self.engine.evaluate("ARQ.001", self.calculator.calculate_arq001(list(components)))
+        metrics = ArchitectureStyleAnalyzer().analyze(inventory(*components), self.criteria["ARQ.001"])
+        return self.engine.evaluate("ARQ.001", metrics)
 
     def evaluate_arq002(self, *components):
-        return self.engine.evaluate("ARQ.002", self.calculator.calculate_arq002(list(components)))
+        metrics = SdkIsolationAnalyzer(TechnologyMatcher(TECHNOLOGIES)).analyze(inventory(*components), self.criteria["ARQ.002"])
+        return self.engine.evaluate("ARQ.002", metrics)
 
 
 class Arq001CatalogTest(CatalogScenarioTest):

@@ -25,32 +25,57 @@ Al terminar deja dos archivos en `result/`:
 - `discovery.json`: el inventario completo del descubrimiento (archivos, hechos, modulos y que criterios tienen insumos).
 
 **4. Arquitectura del proyecto**
-Pipeline por etapas. Cada carpeta tiene una unica responsabilidad y los datos viajan entre etapas como modelos de `src/models/`:
+El analisis pasa por **tres motores independientes**. Cada uno solo recibe el resultado del anterior y no conoce como funciona por dentro:
+
+```
+ repositorio ──► MOTOR 1 Hallazgos ──► MOTOR 2 Analisis ──► MOTOR 3 Evaluacion ──► result/
+                 (que hay)             (que significa)       (que score merece)
+                 RepositoryInventory   metricas por criterio RuleEvaluation
+```
+
+| Motor | Pregunta que responde | Nunca hace |
+|---|---|---|
+| **1. Hallazgos** (`discovery/`) | ¿Que hay en el repositorio? Una sola pasada de Semgrep que produce hechos neutrales | Interpretar o puntuar |
+| **2. Analisis** (`analysis/`) | ¿Que significan esos hechos? Clasifica las capas y calcula las metricas de cada criterio | Leer archivos o asignar scores |
+| **3. Evaluacion** (`evaluation/`) | ¿Que score merece? Aplica las reglas 0/3/5 de `catalog/criteria.yaml` | Conocer un criterio en particular |
 
 ```
 src/
-├── main.py              Orquestacion: config -> clonado -> pipeline -> result/
-├── config/loader.py     Lectura de YAML y del catalogo de criterios (CriterionDefinition)
-├── models/              TODOS los modelos de datos y enums (sin logica)
-│   ├── enums.py         EvaluationStatus, ModuleRole, TechClass, PortabilityClass
-│   ├── discovery.py     Fact, ComponentInfo, ModuleInfo, RepositoryInventory
-│   ├── catalog.py       CriterionDefinition, ScoreRule (criteria.yaml)
-│   ├── metrics.py       CriterionMetrics (base) y metricas por criterio
-│   └── report.py        RuleEvaluation, FinalReport
-└── engine/              Etapas del pipeline
-    ├── semgrep_runner.py  1. Discovery: ejecuta Semgrep y produce Facts (redacta secretos)
-    ├── discoverer.py      1. Discovery: agrupa Facts en componentes y modulos
-    ├── classifier.py      2. Classification: rol de cada componente (dominio/aplicacion/infra)
-    ├── metrics.py         3. Metrics: calcula las metricas de cada criterio
-    ├── scoring.py         4. Scoring: aplica applies_when y los niveles 0/3/5 del catalogo
-    ├── conditions.py         Evaluador de condiciones ("layer_violations <= 5")
-    └── reporting.py       5. Reporting: arma result/discovery.json
+├── main.py                  Orquesta el flujo: clonar -> motor 1 -> motor 2 -> motor 3 -> resultados
+├── repository/              Clonado del repositorio a analizar
+├── discovery/               MOTOR 1 · Hallazgos
+│   ├── engine.py              DiscoveryEngine: punto de entrada del motor
+│   ├── semgrep_runner.py      Ejecuta Semgrep y convierte cada resultado en un Fact (redacta secretos)
+│   └── inventory_builder.py   Agrupa los Facts en componentes y modulos
+├── analysis/                MOTOR 2 · Analisis
+│   ├── engine.py              AnalysisEngine: clasifica capas y ejecuta cada analizador
+│   ├── classifier.py          Capa de cada componente (dominio / aplicacion / infraestructura)
+│   ├── technologies.py        Identifica a que tecnologia del catalogo pertenece un import
+│   ├── registry.py            UNICO lugar donde se registra cada analizador
+│   └── analyzers/             Un archivo por criterio
+│       ├── base.py              CriterionAnalyzer: contrato comun de todos los analizadores
+│       ├── arq001_architecture_style.py
+│       └── arq002_sdk_isolation.py
+├── evaluation/              MOTOR 3 · Evaluacion
+│   ├── engine.py              EvaluationEngine: applies_when, niveles 0/3/5, confianza
+│   └── conditions.py          Evaluador de condiciones ("layer_violations <= 5")
+├── reporting/               Salidas: output.json y discovery.json
+├── models/                  TODOS los modelos de datos y enums (sin logica)
+│   ├── enums.py               EvaluationStatus, ModuleRole, TechClass, PortabilityClass
+│   ├── discovery.py           Fact, ComponentInfo, ModuleInfo, RepositoryInventory
+│   ├── catalog.py             CriterionDefinition, ScoreRule (criteria.yaml)
+│   ├── technology.py          TechnologyDefinition (technology.yaml)
+│   ├── metrics.py             CriterionMetrics (base) y metricas por criterio
+│   └── report.py              RuleEvaluation, FinalReport
+├── config/loader.py         Lectura de la configuracion y de los catalogos
+└── shared/                  Utilidades usadas por mas de un motor
 ```
 
-**Agregar un criterio nuevo:**
+**Agregar un criterio nuevo** (no se toca `main.py` ni el motor de evaluacion):
 1. Declararlo en `catalog/criteria.yaml` (`name`, `confidence`, `applies_when`, `parameters`, `scores`).
 2. Crear su modelo de metricas en `models/metrics.py` heredando de `CriterionMetrics` (si sus condiciones usan valores agregados, sobrescribir `scoring_inputs()`).
-3. Calcularlo en `engine/metrics.py` y registrarlo en `metrics_by_criterion` de `main.py`. El `ScoringEngine` no se modifica.
+3. Crear su analizador en `analysis/analyzers/` heredando de `CriterionAnalyzer`.
+4. Registrarlo en `analysis/registry.py`.
 
 **5. Como funciona el descubrimiento**
 Semgrep es el **unico** extractor de contenido. Las reglas en `rules/` capturan *hechos neutrales* sin interpretarlos:
@@ -70,6 +95,6 @@ Cada regla declara en `metadata` el tipo de hecho (`fact`), los valores capturad
 
 **Condicion N3:** los valores de claves sensibles (password, secret, token...) y las credenciales embebidas nunca se persisten; se guardan como `sha256:<hash>`. De los secretos en codigo solo se guarda el nombre de la variable.
 
-**Pruebas:** `python -m unittest discover -s tests` (valida las reglas contra `tests/fixtures/sample-app`).
+**Pruebas:** `python -m unittest discover -s tests`. Hay un archivo de tests por motor; los del motor 1 usan el proyecto de ejemplo `tests/fixtures/sample-app`.
 
 **Fuera del alcance del descubrimiento estatico** (requieren insumos externos): arbol transitivo / SBOM resuelto, inventario de la nube (T8), export de politicas de APIM (T9), resolucion de tipos con JDT (T10, ola 2), whitelist de frameworks BCP e instantanea de fin de vida.

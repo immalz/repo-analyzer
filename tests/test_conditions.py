@@ -1,8 +1,9 @@
+"""MOTOR 3 - Evaluador de condiciones del catalogo."""
 import unittest
 
 import builders  # noqa: F401  (configura el path de src/)
 
-from engine.conditions import evaluate_condition
+from evaluation.conditions import evaluate_condition
 
 VALUES = {"violations": 5, "present": True, "portability": "CLOUD_SPECIFIC", "ratio": 0.65, "delta": -1}
 

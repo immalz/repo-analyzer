@@ -1,8 +1,9 @@
+"""MOTOR 3 - Motor de evaluacion (scoring contra el catalogo)."""
 import unittest
 
 import builders  # noqa: F401  (configura el path de src/)
 
-from engine.scoring import NOT_APPLICABLE_SCORE, ScoringEngine
+from evaluation.engine import NOT_APPLICABLE_SCORE, EvaluationEngine
 from models.catalog import CriterionDefinition, ScoreRule
 from models.enums import EvaluationStatus
 from models.metrics import CriterionMetrics
@@ -14,7 +15,7 @@ class SampleMetrics(CriterionMetrics):
     violations: int = 0
 
 
-def build_engine() -> ScoringEngine:
+def build_engine() -> EvaluationEngine:
     definition = CriterionDefinition(
         id="TST.001",
         name="Criterio de prueba",
@@ -26,7 +27,7 @@ def build_engine() -> ScoringEngine:
             0: ScoreRule(any=["violations > 4"]),
         },
     )
-    return ScoringEngine({"TST.001": definition})
+    return EvaluationEngine({"TST.001": definition})
 
 
 class ScoringNotApplicableTest(unittest.TestCase):

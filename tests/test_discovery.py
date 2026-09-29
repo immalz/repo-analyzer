@@ -1,11 +1,10 @@
-"""Descubrimiento con Semgrep contra tests/fixtures/sample-app (un proyecto con todas las tecnologias)."""
+"""MOTOR 1 - Descubrimiento con Semgrep contra tests/fixtures/sample-app (un proyecto con todas las tecnologias)."""
 import json
 import unittest
 from functools import lru_cache
 
 from builders import RULES_DIR, SAMPLE_APP
-from engine.discoverer import Discoverer
-from engine.semgrep_runner import load_rule_criteria, run_semgrep
+from discovery.engine import DiscoveryEngine
 
 PLAIN_SECRETS = ["s3cr3t!", "tok_live_123", "Hunter2", "plainTextKafkaPwd", "supersecret", "MIIEowIBAAKCAQEA"]
 
@@ -13,7 +12,7 @@ PLAIN_SECRETS = ["s3cr3t!", "tok_live_123", "Hunter2", "plainTextKafkaPwd", "sup
 @lru_cache(maxsize=1)
 def scan_sample_app():
     """Semgrep se ejecuta una sola vez para todas las clases de este archivo."""
-    return Discoverer(SAMPLE_APP).discover(run_semgrep(SAMPLE_APP, RULES_DIR))
+    return DiscoveryEngine(RULES_DIR).run(SAMPLE_APP)
 
 
 class DiscoveryTestCase(unittest.TestCase):
@@ -39,7 +38,7 @@ class ScanTest(DiscoveryTestCase):
 
     def test_cada_criterio_de_las_reglas_recibe_hechos(self):
         covered = {c for f in self.inventory.facts for c in f.criteria}
-        self.assertEqual(load_rule_criteria(RULES_DIR) - covered, set())
+        self.assertEqual(DiscoveryEngine(RULES_DIR).rule_criteria() - covered, set())
 
 
 class JavaStructureTest(DiscoveryTestCase):

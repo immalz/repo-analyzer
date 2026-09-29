@@ -1,7 +1,10 @@
+"""MOTOR 2 - Analizadores de cada criterio."""
 import unittest
 
-from builders import AZURE_BLOB, TECH_CATALOG, component, port_component
-from engine.metrics import MetricsCalculator
+from builders import AZURE_BLOB, TECHNOLOGIES, component, criterion, inventory, port_component
+from analysis.analyzers.arq001_architecture_style import ArchitectureStyleAnalyzer
+from analysis.analyzers.arq002_sdk_isolation import SdkIsolationAnalyzer
+from analysis.technologies import TechnologyMatcher
 from models.enums import ModuleRole
 
 DOMAIN_IMPORTS = [
@@ -12,6 +15,14 @@ DOMAIN_IMPORTS = [
 ]
 
 
+def analyze_arq001(allowed_packages, *components):
+    return ArchitectureStyleAnalyzer().analyze(inventory(*components), criterion("ARQ.001", allowed_packages))
+
+
+def analyze_arq002(*components):
+    return SdkIsolationAnalyzer(TechnologyMatcher(TECHNOLOGIES)).analyze(inventory(*components), criterion("ARQ.002"))
+
+
 def violating_imports(metrics):
     return [f.attributes["name"] for f in metrics.evidence if f.kind == "java.import"]
 
@@ -19,7 +30,7 @@ def violating_imports(metrics):
 class Arq001DomainWithAllowListTest(unittest.TestCase):
     def setUp(self):
         domain = component("model/Order.java", ModuleRole.DOMAIN, "com.acme.model", imports=DOMAIN_IMPORTS)
-        self.metrics = MetricsCalculator(TECH_CATALOG, ["java", "lombok"]).calculate_arq001([domain, port_component()])
+        self.metrics = analyze_arq001(["java", "lombok"], domain, port_component())
 
     def test_cuenta_solo_los_frameworks_no_permitidos(self):
         self.assertEqual(self.metrics.domain_violations, 2)
@@ -40,7 +51,7 @@ class Arq001DomainWithAllowListTest(unittest.TestCase):
 class Arq001DomainWithoutAllowListTest(unittest.TestCase):
     def setUp(self):
         domain = component("model/Order.java", ModuleRole.DOMAIN, "com.acme.model", imports=DOMAIN_IMPORTS)
-        self.metrics = MetricsCalculator(TECH_CATALOG, []).calculate_arq001([domain, port_component()])
+        self.metrics = analyze_arq001([], domain, port_component())
 
     def test_cuenta_todos_los_imports_externos(self):
         self.assertEqual(self.metrics.domain_violations, 4)
@@ -51,26 +62,56 @@ class Arq001InternalImportsTest(unittest.TestCase):
         domain = component("model/Order.java", ModuleRole.DOMAIN, "com.acme.model",
                            imports=["com.acme.adapter.OrderJpa", "com.acme.model.Money"])
         adapter = component("adapter/OrderJpa.java", ModuleRole.INFRASTRUCTURE, "com.acme.adapter")
-        self.metrics = MetricsCalculator(TECH_CATALOG, ["java"]).calculate_arq001([domain, adapter, port_component()])
+        self.metrics = analyze_arq001(["java"], domain, adapter, port_component())
 
     def test_cuenta_el_import_del_dominio_hacia_infraestructura(self):
         self.assertEqual(violating_imports(self.metrics), ["com.acme.adapter.OrderJpa"])
+
+
+class Arq001ApplicationImportsTest(unittest.TestCase):
+    def setUp(self):
+        service = component("app/OrderService.java", ModuleRole.APPLICATION, "com.acme.app",
+                            imports=["com.acme.adapter.OrderJpa"])
+        adapter = component("adapter/OrderJpa.java", ModuleRole.INFRASTRUCTURE, "com.acme.adapter")
+        self.metrics = analyze_arq001([], service, adapter, port_component())
+
+    def test_cuenta_el_import_de_aplicacion_hacia_infraestructura(self):
+        self.assertEqual(self.metrics.application_violations, 1)
+
+
+class Arq001ApplicationUsingJpaTest(unittest.TestCase):
+    def setUp(self):
+        service = component("app/OrderService.java", ModuleRole.APPLICATION, "com.acme.app",
+                            imports=["jakarta.persistence.Entity"])
+        self.metrics = analyze_arq001([], service, port_component())
+
+    def test_cuenta_jpa_en_la_aplicacion_como_dependencia_de_infraestructura(self):
+        self.assertEqual(self.metrics.application_violations, 1)
 
 
 class Arq001PackagePrefixTest(unittest.TestCase):
     def setUp(self):
         cart = component("model/Cart.java", ModuleRole.DOMAIN, "com.acme.cart", imports=["com.acme.cartitem.Line"])
         cart_item = component("adapter/Line.java", ModuleRole.INFRASTRUCTURE, "com.acme.cartitem")
-        self.metrics = MetricsCalculator(TECH_CATALOG, []).calculate_arq001([cart, cart_item])
+        self.metrics = analyze_arq001([], cart, cart_item)
 
     def test_no_confunde_un_paquete_con_otro_que_empieza_igual(self):
         self.assertEqual(self.metrics.domain_violations, 1)
 
 
+class Arq001WithoutPortsTest(unittest.TestCase):
+    def setUp(self):
+        domain = component("model/Order.java", ModuleRole.DOMAIN, "com.acme.model")
+        self.metrics = analyze_arq001([], domain)
+
+    def test_informa_la_falta_de_capa_de_puertos(self):
+        self.assertTrue(self.metrics.violation_details[-1].startswith("Falta Capa de Puertos"))
+
+
 class Arq002EncapsulatedSdkTest(unittest.TestCase):
     def setUp(self):
         adapter = component("adapter/Blob.java", ModuleRole.INFRASTRUCTURE, "com.acme.adapter", imports=[AZURE_BLOB])
-        self.inputs = MetricsCalculator(TECH_CATALOG, []).calculate_arq002([adapter]).scoring_inputs()
+        self.inputs = analyze_arq002(adapter).scoring_inputs()
 
     def test_cuenta_la_integracion_con_sdk_de_proveedor(self):
         self.assertEqual(self.inputs["vendor_sdk_integrations"], 1)
@@ -86,16 +127,19 @@ class Arq002LeakedSdkTest(unittest.TestCase):
     def setUp(self):
         adapter = component("adapter/Blob.java", ModuleRole.INFRASTRUCTURE, "com.acme.adapter", imports=[AZURE_BLOB])
         domain = component("model/Doc.java", ModuleRole.DOMAIN, "com.acme.model", imports=[AZURE_BLOB])
-        self.inputs = MetricsCalculator(TECH_CATALOG, []).calculate_arq002([adapter, domain]).scoring_inputs()
+        self.inputs = analyze_arq002(adapter, domain).scoring_inputs()
 
     def test_detecta_la_fuga_al_dominio(self):
         self.assertEqual(self.inputs["domain_leak"], 1)
+
+    def test_el_encapsulamiento_baja_a_la_mitad(self):
+        self.assertEqual(self.inputs["encapsulation_ratio"], 0.5)
 
 
 class Arq002WithoutSdkTest(unittest.TestCase):
     def setUp(self):
         adapter = component("adapter/Repo.java", ModuleRole.INFRASTRUCTURE, "com.acme.adapter", imports=["java.util.List"])
-        self.inputs = MetricsCalculator(TECH_CATALOG, []).calculate_arq002([adapter]).scoring_inputs()
+        self.inputs = analyze_arq002(adapter).scoring_inputs()
 
     def test_no_registra_integraciones(self):
         self.assertEqual(self.inputs["vendor_sdk_integrations"], 0)

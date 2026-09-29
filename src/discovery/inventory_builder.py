@@ -3,11 +3,12 @@ import subprocess
 from collections import defaultdict
 from typing import Dict, List
 
-from engine.semgrep_runner import SemgrepScan, EXCLUDED_PATHS
+from discovery.semgrep_runner import EXCLUDED_PATHS, SemgrepScan
 from models.discovery import ComponentInfo, ModuleInfo, RepositoryInventory
+from shared.java_packages import belongs_to
 
 
-class Discoverer:
+class InventoryBuilder:
     """Construye el inventario del repositorio a partir de los hechos de Semgrep.
 
     No lee ni interpreta el contenido de los archivos: esa es la unica
@@ -18,7 +19,7 @@ class Discoverer:
     def __init__(self, target_path: str):
         self.target_path = target_path
 
-    def discover(self, scan: SemgrepScan) -> RepositoryInventory:
+    def build(self, scan: SemgrepScan) -> RepositoryInventory:
         facts_by_file = defaultdict(list)
         for fact in scan.facts:
             facts_by_file[fact.file_path].append(fact)
@@ -80,7 +81,7 @@ class Discoverer:
                     continue
                 for imp in comp.imports:
                     for other, packages in packages_by_module.items():
-                        if other != module.name and any(imp == p or imp.startswith(p + ".") for p in packages):
+                        if other != module.name and belongs_to(imp, packages):
                             deps.add(other)
             module.dependencies = sorted(deps)
         return list(modules.values())

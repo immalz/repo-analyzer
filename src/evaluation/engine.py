@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 
-from engine.conditions import evaluate_condition
+from evaluation.conditions import evaluate_condition
 from models.catalog import CriterionDefinition
 from models.enums import EvaluationStatus
 from models.metrics import CriterionMetrics
@@ -12,8 +12,11 @@ CRITICAL_LEVEL = 0
 NOT_APPLICABLE_SCORE = 5
 
 
-class ScoringEngine:
-    """Asigna el score de un criterio evaluando sus metricas contra catalog/criteria.yaml.
+class EvaluationEngine:
+    """MOTOR 3 - Evaluacion.
+
+    Asigna el score de cada criterio evaluando sus metricas contra catalog/criteria.yaml.
+    No conoce ningun criterio en particular: toda la regla de negocio esta en el catalogo.
 
     Orden de evaluacion:
       1. applies_when: si alguna condicion no se cumple -> NOT_APPLICABLE con NOT_APPLICABLE_SCORE.
@@ -24,6 +27,9 @@ class ScoringEngine:
 
     def __init__(self, criteria: Dict[str, CriterionDefinition]):
         self.criteria = criteria
+
+    def run(self, metrics_by_criterion: Dict[str, CriterionMetrics]) -> List[RuleEvaluation]:
+        return [self.evaluate(criterion_id, metrics) for criterion_id, metrics in metrics_by_criterion.items()]
 
     def evaluate(self, criterion_id: str, metrics: CriterionMetrics) -> RuleEvaluation:
         definition = self.criteria[criterion_id]
