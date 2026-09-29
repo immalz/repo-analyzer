@@ -1,0 +1,61 @@
+# Hechos de empaquetado y despliegue: Dockerfile (T4), manifiestos
+# Kubernetes/Helm (T5) y pipelines de CI/CD.
+rules:
+  - id: dockerfile-instruction
+    languages: [generic]
+    severity: INFO
+    message: "$INSTR|$ARGS"
+    pattern-regex: (?im)^[ \t]*(?P<INSTR>FROM|USER|EXPOSE|ENTRYPOINT|CMD|HEALTHCHECK|VOLUME|COPY|ADD|RUN|ENV|ARG|STOPSIGNAL)[ \t]+(?P<ARGS>[^\r\n]+)
+    paths: {include: ["Dockerfile", "Dockerfile.*", "*.Dockerfile", "*.dockerfile", "Containerfile"]}
+    metadata: {fact: container.instruction, fields: [instruction, args], criteria: [RTM.001, RTM.002, RTM.003, RTM.005, ARQ.009, SEG.006, SRE.001, SRE.003]}
+
+  - id: k8s-object
+    languages: [yaml]
+    severity: INFO
+    message: "$API|$KIND"
+    pattern: |
+      apiVersion: $API
+      ...
+      kind: $KIND
+    metadata: {fact: manifest.object, fields: [api_version, kind], criteria: [INF.002, RTM.003, SEG.004, ARQ.009]}
+
+  - id: manifest-key
+    languages: [yaml]
+    severity: INFO
+    message: "$KEY|$VALUE"
+    patterns:
+      - pattern: "$KEY: $VALUE"
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: ^(image|sessionAffinity|privileged|runAsNonRoot|runAsUser|allowPrivilegeEscalation|readOnlyRootFilesystem|hostPath|hostNetwork|hostPID|claimName|mountPath|livenessProbe|readinessProbe|startupProbe|preStop|terminationGracePeriodSeconds|configMapRef|secretRef|secretKeyRef|configMapKeyRef|serviceAccountName|storageClassName|nodeSelector|kubernetes\.io/arch|prometheus\.io/[\w-]+|azure\.workload\.identity/[\w-]+|eks\.amazonaws\.com/[\w-]+|iam\.gke\.io/[\w-]+|provider|secretObjects)$
+    paths:
+      exclude: ["application*.yml", "application*.yaml", "bootstrap*.yml", "bootstrap*.yaml"]
+    metadata: {fact: manifest.key, fields: [key, value], criteria: [INF.002, RTM.001, RTM.003, RTM.005, ARQ.009, SEG.002, SEG.004, SRE.002]}
+
+  - id: manifest-env-literal
+    languages: [yaml]
+    severity: INFO
+    message: "$NAME|$VALUE"
+    pattern: |
+      name: $NAME
+      value: $VALUE
+    paths:
+      exclude: ["application*.yml", "application*.yaml", "bootstrap*.yml", "bootstrap*.yaml"]
+    metadata: {fact: manifest.env, fields: [name, value], criteria: [RTM.002, INF.002, SEG.004]}
+
+  - id: pipeline-action
+    languages: [yaml]
+    severity: INFO
+    message: "$ACTION"
+    pattern: "uses: $ACTION"
+    paths: {include: [".github/workflows/*"]}
+    metadata: {fact: pipeline.step, fields: [action], criteria: [RTM.001, INF.001, INF.002]}
+
+  - id: pipeline-command
+    languages: [generic]
+    severity: INFO
+    message: "$TOOL|$SUB"
+    pattern-regex: (?m)\b(?P<TOOL>az|aws|gcloud|kubectl|helm|kustomize|docker|podman|terraform|tofu|pulumi|oc|func|sam|cdk)[ \t]+(?P<SUB>[a-z][\w-]*)
+    paths:
+      include: [".github/workflows/*", "azure-pipelines*.yml", "azure-pipelines*.yaml", "Jenkinsfile", ".gitlab-ci.yml", "*.sh", "Makefile", "buildspec.yml", "cloudbuild.yaml"]
+    metadata: {fact: pipeline.command, fields: [tool, subcommand], criteria: [RTM.001, RTM.005, INF.001, INF.002]}

@@ -1,0 +1,204 @@
+# Hechos extraidos del codigo fuente Java (T1 patrones + T2 imports).
+# Convencion: metadata.fact = tipo de hecho, metadata.fields = nombres de los
+# valores capturados en `message` (separados por "|"), metadata.criteria =
+# criterios del catalogo que consumen el hecho. No se interpreta nada aqui.
+rules:
+  # ---------- Estructura ----------
+  - id: java-package
+    languages: [java]
+    severity: INFO
+    message: "$PKG"
+    pattern: package $PKG;
+    metadata: {fact: java.package, fields: [name], criteria: [ARQ.001, ARQ.004]}
+
+  - id: java-import
+    languages: [java]
+    severity: INFO
+    message: "$NAME"
+    pattern-either:
+      - pattern: import $NAME;
+      - pattern: import static $NAME;
+    metadata:
+      fact: java.import
+      fields: [name]
+      criteria: [ARQ.001, ARQ.002, ARQ.003, ARQ.004, ARQ.006, RTM.003, RTM.004, DAT.001, DAT.004,
+                 PLT.001, PLT.002, PLT.003, PLT.005, PLT.006, PLT.007, SEG.001, SEG.002, SEG.003,
+                 SEG.004, SEG.005, SEG.007, SRE.001, SRE.002, SRE.004]
+
+  - id: java-interface
+    languages: [java]
+    severity: INFO
+    message: "$NAME"
+    patterns:
+      - pattern: interface $NAME { ... }
+      - pattern-not: "@interface $NAME { ... }"
+    metadata: {fact: java.type, fields: [name], kind: interface, criteria: [ARQ.001, ARQ.002, ARQ.004]}
+
+  - id: java-annotation-type
+    languages: [java]
+    severity: INFO
+    message: "$NAME"
+    pattern: "@interface $NAME { ... }"
+    metadata: {fact: java.type, fields: [name], kind: annotation, criteria: [ARQ.003]}
+
+  - id: java-enum
+    languages: [java]
+    severity: INFO
+    message: "$NAME"
+    pattern: enum $NAME { ... }
+    metadata: {fact: java.type, fields: [name], kind: enum, criteria: [ARQ.001]}
+
+  - id: java-record
+    languages: [java]
+    severity: INFO
+    message: "$NAME"
+    pattern: record $NAME(...) { ... }
+    metadata: {fact: java.type, fields: [name], kind: record, criteria: [ARQ.001]}
+
+  - id: java-class
+    languages: [java]
+    severity: INFO
+    message: "$NAME"
+    patterns:
+      - pattern: class $NAME { ... }
+      - pattern-not: enum $NAME { ... }
+      - pattern-not: record $NAME(...) { ... }
+    metadata: {fact: java.type, fields: [name], kind: class, criteria: [ARQ.001, ARQ.004]}
+
+  - id: java-implements
+    languages: [java]
+    severity: INFO
+    message: "$NAME|$IFACE"
+    pattern: class $NAME implements $IFACE { ... }
+    metadata: {fact: java.implements, fields: [type, interface], criteria: [ARQ.001, ARQ.002, ARQ.003, RTM.004, PLT.002]}
+
+  - id: java-extends
+    languages: [java]
+    severity: INFO
+    message: "$NAME|$PARENT"
+    pattern: class $NAME extends $PARENT { ... }
+    metadata: {fact: java.extends, fields: [type, parent], criteria: [ARQ.003, ARQ.004]}
+
+  - id: java-annotation
+    languages: [java]
+    severity: INFO
+    message: "$NAME"
+    patterns:
+      - pattern: "@$NAME(...)"
+      # Semgrep representa algunos modificadores como anotaciones.
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: ^(?!(native|synchronized|transient|volatile|strictfp|abstract|final|static|public|private|protected|default|sealed)$)
+    metadata:
+      fact: java.annotation
+      fields: [name]
+      criteria: [ARQ.003, ARQ.004, ARQ.005, ARQ.009, RTM.002, RTM.004, PLT.001, PLT.002, PLT.003,
+                 PLT.005, PLT.007, SEG.003]
+
+  - id: java-annotation-value
+    languages: [java]
+    severity: INFO
+    message: "$NAME|value|$VALUE"
+    pattern: '@$NAME("$VALUE")'
+    metadata: {fact: java.annotation-arg, fields: [name, key, value], criteria: [ARQ.005, RTM.002, PLT.001, PLT.002, PLT.004, SEG.003, SRE.004]}
+
+  - id: java-annotation-named-arg
+    languages: [java]
+    severity: INFO
+    message: "$NAME|$KEY|$VALUE"
+    pattern: "@$NAME(..., $KEY = $VALUE, ...)"
+    metadata: {fact: java.annotation-arg, fields: [name, key, value], criteria: [ARQ.004, ARQ.005, DAT.001, PLT.001, PLT.002]}
+
+  - id: java-main-method
+    languages: [java]
+    severity: INFO
+    message: "$ARGS"
+    pattern: |
+      public static void main(String[] $ARGS) { ... }
+    metadata: {fact: java.entrypoint, fields: [args], criteria: [RTM.004, PLT.002]}
+
+  - id: java-native-method
+    languages: [java]
+    severity: INFO
+    message: "$NAME"
+    pattern: native $RET $NAME(...);
+    metadata: {fact: java.native-method, fields: [name], criteria: [RTM.005]}
+
+  # ---------- Llamadas y construcciones relevantes ----------
+  # El receptor no se resuelve por tipo (no se compila, condicion N1): se
+  # captura el texto del receptor y el metodo; la interpretacion es del catalogo.
+  - id: java-call-with-literal
+    languages: [java]
+    severity: INFO
+    message: "$RECV|$METHOD|$ARG"
+    patterns:
+      - pattern: $RECV.$METHOD("$ARG", ...)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(getenv|getProperty|getInstance|loadLibrary|load|exec|getHeader|getHeaders|setHeader|addHeader|header|hasRole|hasAnyRole|hasAuthority|isUserInRole|get|write|writeString|newOutputStream|newBufferedWriter|createFile|createTempFile|createDirectories)$
+    metadata: {fact: java.call, fields: [receiver, method, arg], criteria: [RTM.002, RTM.003, RTM.005, PLT.004, SEG.003, SEG.005, SRE.004]}
+
+  - id: java-call
+    languages: [java]
+    severity: INFO
+    message: "$RECV|$METHOD"
+    patterns:
+      - pattern: $RECV.$METHOD(...)
+      - pattern-not: $RECV.$METHOD("$ARG", ...)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(exec|exit|halt|addShutdownHook|getenv|addProvider|insertProviderAt|getSession|generateSas|generateSasToken|generateUserDelegationSas|generatePresignedUrl|presignGetObject|presignPutObject|setSessionId|acceptSession|acceptNextSession|executeInTransaction|beginTransaction|commitTransaction|sendTransactional|opsForStream|convertAndSend|getLock|tryLock)$
+    metadata: {fact: java.call, fields: [receiver, method], criteria: [RTM.003, RTM.005, ARQ.009, PLT.001, PLT.002, PLT.005, DAT.004, SEG.005]}
+
+  - id: java-new-with-literal
+    languages: [java]
+    severity: INFO
+    message: "$CLASS|$ARG"
+    patterns:
+      - pattern: new $CLASS("$ARG", ...)
+      - metavariable-regex:
+          metavariable: $CLASS
+          regex: .*(File|FileOutputStream|FileInputStream|FileWriter|FileReader|RandomAccessFile|PrintWriter|ProcessBuilder|Socket|URL|URI|SecretKeySpec|KeyStore|Credential|CredentialBuilder|Client|ClientBuilder)$
+    metadata: {fact: java.new, fields: [class, arg], criteria: [RTM.003, RTM.005, SEG.005, SEG.006]}
+
+  - id: java-new
+    languages: [java]
+    severity: INFO
+    message: "$CLASS"
+    patterns:
+      - pattern: new $CLASS(...)
+      - pattern-not: new $CLASS("$ARG", ...)
+      - metavariable-regex:
+          metavariable: $CLASS
+          regex: .*(File|FileOutputStream|FileWriter|RandomAccessFile|PrintWriter|ObjectOutputStream|ProcessBuilder|Timer|ScheduledThreadPoolExecutor|Socket|ServerSocket|SecretKeySpec|KeyStore|Credential|CredentialBuilder|Client|ClientBuilder|Template)$
+    metadata: {fact: java.new, fields: [class], criteria: [RTM.003, RTM.005, PLT.002, SEG.002, SEG.005]}
+
+  # ---------- Literales ----------
+  - id: java-string-literal
+    languages: [java]
+    severity: INFO
+    message: "$VALUE"
+    patterns:
+      - pattern: '"$VALUE"'
+      - metavariable-regex:
+          metavariable: $VALUE
+          # URLs/URIs, SQL, rutas absolutas de SO, FQDN de proveedores, headers de gateway/trazas
+          regex: (?i)(^[a-z][a-z0-9+.\-]*://|^jdbc:|^\s*(select|insert|update|delete|merge|call|exec|with)\s|^(/(usr|var|opt|etc|tmp|home|mnt|data|srv|dev|proc)/|[a-z]:\\)|.*\.(windows\.net|azure\.com|azure\.net|azurewebsites\.net|azurecr\.io|cloudapp\.net|amazonaws\.com|googleapis\.com|appspot\.com)\b|(x-forwarded-|ocp-apim-|x-apim-|x-ms-|x-amzn-|x-goog-|traceparent$|tracestate$|baggage$|x-correlation-id$|x-request-id$|x-b3-))
+    metadata: {fact: java.string-literal, fields: [value], criteria: [ARQ.004, RTM.002, RTM.003, RTM.005, DAT.001, DAT.004, PLT.004, PLT.006, SRE.004]}
+
+  - id: java-hardcoded-secret
+    languages: [java]
+    severity: INFO
+    # Solo se captura el NOMBRE de la variable, nunca el valor (condicion N3).
+    message: "$VAR"
+    patterns:
+      - pattern-either:
+          - pattern: $TYPE $VAR = "$SECRET";
+          - pattern: $VAR = "$SECRET";
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i).*(passw|pwd|secret|token|apikey|api_key|credential|private_?key|access_?key|client_?secret|conn(ection)?_?str).*
+      - metavariable-regex:
+          metavariable: $SECRET
+          regex: .+
+    metadata: {fact: secret.hardcoded, fields: [name], source: java, criteria: [RTM.002, SEG.002, SEG.004]}

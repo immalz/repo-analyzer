@@ -1,0 +1,54 @@
+# Hechos de contratos de API y eventos (T3): OpenAPI/Swagger, AsyncAPI,
+# Protobuf, Avro y CloudEvents.
+rules:
+  - id: contract-spec-version
+    languages: [yaml]
+    severity: INFO
+    message: "$SPEC|$VERSION"
+    patterns:
+      - pattern: "$SPEC: $VERSION"
+      - metavariable-regex: {metavariable: $SPEC, regex: ^(openapi|swagger|asyncapi|specversion)$}
+    metadata: {fact: contract.spec, fields: [spec, version], criteria: [ARQ.005, ARQ.006, PLT.004]}
+
+  - id: contract-spec-version-json
+    languages: [json]
+    severity: INFO
+    message: "$SPEC|$VERSION"
+    patterns:
+      - pattern: '"$SPEC": $VERSION'
+      - metavariable-regex: {metavariable: $SPEC, regex: ^(openapi|swagger|asyncapi|specversion)$}
+    metadata: {fact: contract.spec, fields: [spec, version], criteria: [ARQ.005, ARQ.006, PLT.004]}
+
+  - id: contract-extension
+    languages: [yaml]
+    severity: INFO
+    message: "$KEY"
+    patterns:
+      - pattern: "$KEY: $VALUE"
+      - metavariable-regex: {metavariable: $KEY, regex: ^x-}
+    metadata: {fact: contract.extension, fields: [key], criteria: [ARQ.005, PLT.004]}
+
+  - id: contract-path
+    languages: [yaml]
+    severity: INFO
+    message: "$PATH"
+    patterns:
+      - pattern: "$PATH: $OPS"
+      - metavariable-regex: {metavariable: $PATH, regex: ^/}
+    metadata: {fact: contract.path, fields: [path], criteria: [ARQ.005]}
+
+  - id: avro-record
+    languages: [generic]
+    severity: INFO
+    message: "$NAME"
+    pattern-regex: '"type"\s*:\s*"record"\s*,\s*"name"\s*:\s*"(?P<NAME>[\w.]+)"'
+    paths: {include: ["*.avsc", "*.avro.json"]}
+    metadata: {fact: contract.schema, fields: [name], format: avro, criteria: [ARQ.006]}
+
+  - id: protobuf-declaration
+    languages: [generic]
+    severity: INFO
+    message: "$KIND|$NAME"
+    pattern-regex: (?m)^\s*(?P<KIND>syntax|service|message)\s*=?\s*"?(?P<NAME>[\w.]+)
+    paths: {include: ["*.proto"]}
+    metadata: {fact: contract.schema, fields: [kind, name], format: protobuf, criteria: [ARQ.005, ARQ.006]}

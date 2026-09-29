@@ -1,0 +1,14 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.microsoftonline.com/tenant-id/v2.0
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS}
+    password: plainTextKafkaPwd
+  cloud:
+    azure:
+      keyvault:
+        secret:
+          endpoint: https://acme-kv.vault.azure.net/

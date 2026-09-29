@@ -1,0 +1,107 @@
+# Hechos de manifiestos de build (T0: dependencias DECLARADAS).
+# El arbol transitivo / SBOM completo requiere resolver dependencias y queda
+# fuera del descubrimiento estatico.
+rules:
+  - id: maven-dependency
+    languages: [xml]
+    severity: INFO
+    message: "$GROUP|$ARTIFACT"
+    patterns:
+      - pattern: <dependency>...<groupId>$GROUP</groupId>...<artifactId>$ARTIFACT</artifactId>...</dependency>
+      - pattern-not: <dependency>...<version>$VERSION</version>...</dependency>
+    paths: {include: ["pom.xml", "*.pom"]}
+    metadata:
+      fact: build.dependency
+      fields: [group, artifact]
+      manager: maven
+      criteria: [ARQ.002, ARQ.003, ARQ.008, RTM.004, DAT.001, DAT.002, DAT.004, PLT.001, PLT.003, PLT.005,
+                 PLT.007, SEG.001, SEG.005, SEG.007, SRE.001, SRE.002, SRE.004]
+
+  - id: maven-dependency-versioned
+    languages: [xml]
+    severity: INFO
+    message: "$GROUP|$ARTIFACT|$VERSION"
+    pattern: <dependency>...<groupId>$GROUP</groupId>...<artifactId>$ARTIFACT</artifactId>...<version>$VERSION</version>...</dependency>
+    paths: {include: ["pom.xml", "*.pom"]}
+    metadata:
+      fact: build.dependency
+      fields: [group, artifact, version]
+      manager: maven
+      criteria: [ARQ.002, ARQ.003, ARQ.008, RTM.004, DAT.001, DAT.002, DAT.004, PLT.001, PLT.003, PLT.005,
+                 PLT.007, SEG.001, SEG.005, SEG.007, SRE.001, SRE.002, SRE.004]
+
+  - id: maven-parent
+    languages: [xml]
+    severity: INFO
+    message: "$GROUP|$ARTIFACT|$VERSION"
+    pattern: <parent>...<groupId>$GROUP</groupId>...<artifactId>$ARTIFACT</artifactId>...<version>$VERSION</version>...</parent>
+    paths: {include: ["pom.xml"]}
+    metadata: {fact: build.parent, fields: [group, artifact, version], manager: maven, criteria: [ARQ.003, ARQ.008]}
+
+  - id: maven-plugin
+    languages: [xml]
+    severity: INFO
+    message: "$ARTIFACT"
+    pattern: <plugin>...<artifactId>$ARTIFACT</artifactId>...</plugin>
+    paths: {include: ["pom.xml"]}
+    metadata: {fact: build.plugin, fields: [artifact], manager: maven, criteria: [RTM.001, RTM.004, ARQ.008]}
+
+  - id: maven-repository
+    languages: [xml]
+    severity: INFO
+    message: "$URL"
+    pattern-either:
+      - pattern: <repository>...<url>$URL</url>...</repository>
+      - pattern: <pluginRepository>...<url>$URL</url>...</pluginRepository>
+    paths: {include: ["pom.xml", "settings.xml"]}
+    metadata: {fact: build.repository, fields: [url], manager: maven, criteria: [ARQ.008]}
+
+  - id: maven-packaging
+    languages: [xml]
+    severity: INFO
+    message: "$TYPE"
+    pattern: <packaging>$TYPE</packaging>
+    paths: {include: ["pom.xml"]}
+    metadata: {fact: build.packaging, fields: [type], manager: maven, criteria: [RTM.001, RTM.004]}
+
+  - id: maven-module
+    languages: [xml]
+    severity: INFO
+    message: "$NAME"
+    pattern: <module>$NAME</module>
+    paths: {include: ["pom.xml"]}
+    metadata: {fact: build.module, fields: [name], manager: maven, criteria: [ARQ.001]}
+
+  - id: gradle-dependency
+    languages: [generic]
+    severity: INFO
+    message: "$CONF|$GROUP|$ARTIFACT"
+    pattern-regex: (?P<CONF>implementation|api|compileOnly|runtimeOnly|annotationProcessor|compile|runtime)\s*\(?\s*['"](?P<GROUP>[\w.\-]+):(?P<ARTIFACT>[\w.\-]+)['"]
+    paths: {include: ["*.gradle", "*.gradle.kts"]}
+    metadata:
+      fact: build.dependency
+      fields: [scope, group, artifact]
+      manager: gradle
+      criteria: [ARQ.002, ARQ.003, ARQ.008, RTM.004, DAT.001, DAT.004, PLT.001, PLT.003, PLT.005, PLT.007,
+                 SEG.001, SEG.005, SEG.007, SRE.001, SRE.002, SRE.004]
+
+  - id: gradle-dependency-versioned
+    languages: [generic]
+    severity: INFO
+    message: "$CONF|$GROUP|$ARTIFACT|$VERSION"
+    pattern-regex: (?P<CONF>implementation|api|compileOnly|runtimeOnly|annotationProcessor|compile|runtime)\s*\(?\s*['"](?P<GROUP>[\w.\-]+):(?P<ARTIFACT>[\w.\-]+):(?P<VERSION>[\w.\-${}]+)['"]
+    paths: {include: ["*.gradle", "*.gradle.kts"]}
+    metadata:
+      fact: build.dependency
+      fields: [scope, group, artifact, version]
+      manager: gradle
+      criteria: [ARQ.002, ARQ.003, ARQ.008, RTM.004, DAT.001, DAT.004, PLT.001, PLT.003, PLT.005, PLT.007,
+                 SEG.001, SEG.005, SEG.007, SRE.001, SRE.002, SRE.004]
+
+  - id: gradle-plugin
+    languages: [generic]
+    severity: INFO
+    message: "$ID"
+    pattern-regex: \bid\s*\(?\s*['"](?P<ID>[\w.\-]+)['"]
+    paths: {include: ["*.gradle", "*.gradle.kts"]}
+    metadata: {fact: build.plugin, fields: [artifact], manager: gradle, criteria: [RTM.001, RTM.004, ARQ.008]}

@@ -9,6 +9,14 @@ criteria:
       - application_violations
       - ports_layer_present
 
+    parameters:
+      # Paquetes externos que el dominio puede importar sin contar como layer_violation.
+      # Cualquier otro framework o SDK externo importado desde el dominio SI cuenta.
+      # Propuesta inicial, a validar con el comite.
+      domain_allowed_packages:
+        - java
+        - lombok
+
     scores:
       5:
         all:
@@ -34,6 +42,11 @@ criteria:
       - domain_leak
       - encapsulation_ratio
       - spread
+
+    # Catalogo: integrations.exists(i, i.tech_class == 'VENDOR_SDK').
+    # Si no hay SDK de proveedor el criterio es NOT_APPLICABLE y sale del denominador.
+    applies_when:
+      - vendor_sdk_integrations > 0
 
     scores:
       5:

@@ -1,4 +1,5 @@
-from models.domain_models import ComponentInfo, ModuleRole
+from models.discovery import ComponentInfo
+from models.enums import ModuleRole
 from typing import List, Dict
 
 class Classifier:
@@ -11,7 +12,8 @@ class Classifier:
 
     def _determine_role(self, comp: ComponentInfo) -> ModuleRole:
         # 1. Overrides manuales
-        normalized_path = comp.file_path.replace("\\", "/")
+        # Las rutas son relativas al repo; el "/" inicial permite que "/domain/" coincida en la raiz.
+        normalized_path = "/" + comp.file_path.replace("\\", "/")
         for role_name, patterns in self.overrides.items():
             for pattern in patterns:
                 simple_pattern = pattern.replace("**", "").replace("*", "").replace("\\", "/")

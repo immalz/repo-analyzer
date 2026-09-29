@@ -1,0 +1,56 @@
+# Hechos de configuracion de la aplicacion: properties, YAML de Spring y
+# configuracion de logging. Los valores sensibles se redactan en Python antes
+# de persistirse (condicion N3).
+rules:
+  - id: config-properties
+    languages: [generic]
+    severity: INFO
+    message: "$KEY|$VALUE"
+    pattern-regex: (?m)^[ \t]*(?P<KEY>[A-Za-z][\w.\-\[\]]*)[ \t]*[=:][ \t]*(?P<VALUE>[^\r\n]*)
+    paths: {include: ["*.properties"]}
+    metadata:
+      fact: config.property
+      fields: [key, value]
+      format: properties
+      criteria: [RTM.002, RTM.003, ARQ.009, DAT.001, PLT.001, PLT.005, PLT.006, SEG.001, SEG.004, SEG.006,
+                 SEG.007, SRE.001, SRE.002, SRE.003]
+
+  - id: config-yaml
+    languages: [yaml]
+    severity: INFO
+    message: "$KEY|$VALUE"
+    patterns:
+      - pattern: "$KEY: $VALUE"
+      # Solo hojas escalares: se descartan mapas anidados ("clave: valor" o multilinea).
+      - metavariable-regex: {metavariable: $VALUE, regex: '^(?![\w.\-]+:\s)[^\n]*$'}
+    paths: {include: ["application*.yml", "application*.yaml", "bootstrap*.yml", "bootstrap*.yaml"]}
+    metadata:
+      fact: config.property
+      fields: [key, value]
+      format: yaml
+      criteria: [RTM.002, RTM.003, ARQ.009, DAT.001, PLT.001, PLT.005, PLT.006, SEG.001, SEG.004, SEG.006,
+                 SEG.007, SRE.001, SRE.002, SRE.003]
+
+  - id: logging-component
+    languages: [generic]
+    severity: INFO
+    message: "$CLASS"
+    pattern-regex: class\s*=\s*"(?P<CLASS>[\w.$]+)"
+    paths: {include: ["logback*.xml", "log4j2*.xml", "log4j*.xml"]}
+    metadata: {fact: logging.component, fields: [class], criteria: [SRE.003, RTM.003]}
+
+  - id: logging-element
+    languages: [generic]
+    severity: INFO
+    message: "$TAG"
+    pattern-regex: <(?P<TAG>RollingFile|RollingRandomAccessFile|File|RandomAccessFile|Console|JsonLayout|JsonTemplateLayout|EcsLayout|GelfLayout|Syslog)\b
+    paths: {include: ["log4j2*.xml", "log4j*.xml"]}
+    metadata: {fact: logging.component, fields: [class], criteria: [SRE.003, RTM.003]}
+
+  - id: logging-mdc-key
+    languages: [generic]
+    severity: INFO
+    message: "$KEY"
+    pattern-regex: '%X\{(?P<KEY>[\w.\-]+)'
+    paths: {include: ["logback*.xml", "log4j2*.xml", "log4j*.xml", "*.properties", "application*.yml", "application*.yaml"]}
+    metadata: {fact: logging.mdc-key, fields: [key], criteria: [SRE.003, SRE.004]}

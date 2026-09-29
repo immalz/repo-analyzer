@@ -1,0 +1,1 @@
+{"type": "record", "name": "OrderCreated", "namespace": "com.acme.events", "fields": [{"name": "id", "type": "string"}]}

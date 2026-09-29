@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop
+  annotations:
+    prometheus.io/scrape: "true"
+spec:
+  template:
+    spec:
+      containers:
+        - name: shop
+          image: acmeregistry.azurecr.io/shop:1.0.0
+          env:
+            - name: APP_ENV
+              value: production
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef: {name: shop-db, key: password}
+          envFrom:
+            - configMapRef: {name: shop-config}
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 8080}
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 8080}
+          securityContext:
+            privileged: true
+            runAsNonRoot: false
+          volumeMounts:
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: shop-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop
+spec:
+  sessionAffinity: ClientIP

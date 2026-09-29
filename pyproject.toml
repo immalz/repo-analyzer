@@ -1,0 +1,6 @@
+# Configuracion del analisis estatico del editor: el codigo fuente vive en src/.
+[tool.pyright]
+extraPaths = ["src", "tests"]
+
+[tool.pyrefly]
+search-path = ["src", "tests"]

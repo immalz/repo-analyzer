@@ -1,0 +1,19 @@
+# Hechos de esquema y SQL versionado (T6): DDL, migraciones y tokens
+# especificos de motor. El motor al que pertenece cada token lo decide el
+# catalogo, no la regla.
+rules:
+  - id: sql-ddl-object
+    languages: [generic]
+    severity: INFO
+    message: "$OBJECT|$NAME"
+    pattern-regex: (?i)\bcreate\s+(?:or\s+replace\s+|or\s+alter\s+)?(?P<OBJECT>procedure|proc|trigger|sequence|function|table|view|index|type|package)\s+(?:if\s+not\s+exists\s+)?(?P<NAME>[\w.\[\]"]+)
+    paths: {include: ["*.sql"]}
+    metadata: {fact: sql.ddl, fields: [object, name], criteria: [DAT.002, DAT.001]}
+
+  - id: sql-vendor-token
+    languages: [generic]
+    severity: INFO
+    message: "$TOKEN"
+    pattern-regex: (?i)\b(?P<TOKEN>uniqueidentifier|nvarchar|datetime2|datetimeoffset|money|smallmoney|tinyint|bit|image|varchar2|nvarchar2|number|clob|nclob|blob|raw|rowid|jsonb|serial|bigserial|bytea|citext|inet|auto_increment|identity|getdate|sysdatetime|isnull|nvl|nvl2|decode|sysdate|systimestamp|rownum|connect\s+by|top\s+\d+|nolock|merge\s+into|output\s+inserted|returning|ilike|string_agg|listagg|dual)\b
+    paths: {include: ["*.sql"]}
+    metadata: {fact: sql.vendor-token, fields: [token], criteria: [DAT.001, DAT.002]}

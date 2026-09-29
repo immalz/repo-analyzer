@@ -1,0 +1,8 @@
+name: deploy
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/webapps-deploy@v2
+      - run: az webapp restart --name shop

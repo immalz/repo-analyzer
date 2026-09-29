@@ -1,0 +1,53 @@
+# Hechos de infraestructura como codigo (T5): Terraform/OpenTofu, Bicep,
+# CloudFormation y plantillas ARM.
+rules:
+  - id: terraform-resource
+    languages: [terraform]
+    severity: INFO
+    message: "$TYPE|$NAME"
+    pattern: resource "$TYPE" "$NAME" {...}
+    metadata: {fact: iac.resource, fields: [type, name], tool: terraform, criteria: [INF.001]}
+
+  - id: terraform-provider
+    languages: [terraform]
+    severity: INFO
+    message: "$NAME"
+    pattern: provider "$NAME" {...}
+    metadata: {fact: iac.provider, fields: [name], tool: terraform, criteria: [INF.001]}
+
+  - id: terraform-module
+    languages: [terraform]
+    severity: INFO
+    message: "$NAME"
+    pattern: module "$NAME" {...}
+    metadata: {fact: iac.module, fields: [name], tool: terraform, criteria: [INF.001]}
+
+  - id: bicep-resource
+    languages: [generic]
+    severity: INFO
+    message: "$TYPE|$NAME"
+    pattern-regex: (?m)^\s*resource\s+(?P<NAME>\w+)\s+'(?P<TYPE>[^'@]+)
+    paths: {include: ["*.bicep"]}
+    metadata: {fact: iac.resource, fields: [type, name], tool: bicep, criteria: [INF.001]}
+
+  - id: cloudformation-resource
+    languages: [yaml]
+    severity: INFO
+    message: "$TYPE"
+    patterns:
+      - pattern: "Type: $TYPE"
+      - metavariable-regex:
+          metavariable: $TYPE
+          regex: '^["'']?(AWS|Alexa)::'
+    metadata: {fact: iac.resource, fields: [type], tool: cloudformation, criteria: [INF.001]}
+
+  - id: arm-resource
+    languages: [json]
+    severity: INFO
+    message: "$TYPE"
+    patterns:
+      - pattern: '"type": $TYPE'
+      - metavariable-regex:
+          metavariable: $TYPE
+          regex: '^"Microsoft\.'
+    metadata: {fact: iac.resource, fields: [type], tool: arm, criteria: [INF.001]}

@@ -1,0 +1,3 @@
+syntax = "proto3";
+package acme.shop;
+service OrderService { rpc Get (GetRequest) returns (Order); }
